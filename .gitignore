@@ -1,0 +1,9 @@
+.env
+/*.log
+
+# Ignore everything under data/, then allow committed templates & config
+/data/**
+!/data/
+!/data/.htaccess
+!/data/*.example.php
+!/data/tasks.example.json

@@ -1,0 +1,47 @@
+Akhurath Studio — build & test checklist
+========================================
+
+Phase 1 — Public website (layout + portfolio + contact)
+------------------------------------------------------
+Goal: Visitors see home, services, YouTube portfolio, clients strip, contact form.
+
+1) Upload the whole project folder to hosting (same structure), or run locally:
+   php -S localhost:8080 -t /path/to/cursor
+2) Open /index.php — check hero, marquee, services (dark grid), work cards.
+3) Hover a work card (desktop): muted YouTube preview. On phone: tap the title/credit block to toggle preview.
+4) Open /contact.php — submit a test message. Confirm data/leads.jsonl was created (FTP / file manager). File is gitignored.
+5) Replace samples in config/portfolio.php with your real YouTube IDs and titles.
+6) Edit config/services.php and config/clients.php as needed.
+7) Optional: keep landing-simple.php as a minimal one-file page; main site is index.php.
+
+Phase 2 — Client login + drive link (NAS / Synology / Nextcloud)
+----------------------------------------------------------------
+Goal: Customers sign in on YOUR site, then open drive.akhurathstudio.com with the credentials YOU create on the NAS.
+
+1) On your computer:
+   php scripts/hash-password.php 'ClientSecretPassword'
+2) Copy data/customers.example.php to data/customers.php (same folder).
+3) Edit data/customers.php:
+   return [
+     'client_username' => 'paste_hash_here',
+   ];
+4) Upload data/customers.php to the server (outside git). data/.htaccess blocks web access to the folder on Apache.
+5) In includes/config.php set DRIVE_PORTAL_URL if your drive URL differs.
+6) Test /customer/login.php — bad password fails, good password opens /customer/dashboard.php.
+7) Click “Open client drive” — confirm your NAS login page loads.
+
+Important: This PHP login does NOT sync passwords with the NAS automatically.
+Create matching usernames/passwords on the NAS only if your stack supports it;
+otherwise the site login is separate from the drive login (dashboard explains this).
+
+Nginx: .htaccess inside /data/ is ignored. Deny /data/ in your server block or move secrets outside the web root.
+
+Phase 3 (later) — Polish & integrations
+---------------------------------------
+- Swap placeholder portfolio entries; add testimonial videos or quotes.
+- SMTP for contact form instead of JSONL file.
+- HTTPS everywhere; tighten session cookie flags if you terminate TLS at a proxy.
+
+References used for direction (not copied assets):
+- https://prapermedia.com/ — section rhythm, services grid, social proof strip.
+- https://kiranproductions.in/ — elegant serif + clean sans pairing.
