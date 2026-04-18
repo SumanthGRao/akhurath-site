@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 
+@date_default_timezone_set(AKH_SITE_TIMEZONE);
+
 $life = max(60, (int) AKH_SESSION_LIFETIME_SECONDS);
 @ini_set('session.gc_maxlifetime', (string) $life);
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 require_once AKH_ROOT . '/includes/editor-auth.php';
 require_once AKH_ROOT . '/includes/editor-attendance.php';
+require_once AKH_ROOT . '/includes/editor-leave.php';
 require_once AKH_ROOT . '/includes/tasks.php';
 require_once AKH_ROOT . '/includes/task-thread-panel.php';
 require_once AKH_ROOT . '/includes/csrf.php';
@@ -110,6 +111,7 @@ $pageCsrf = akh_csrf_token();
 $attendanceOn = AKH_EDITOR_ATTENDANCE_ENABLED && akh_editor_attendance_is_clocked_in($editor);
 $attendanceSinceTs = AKH_EDITOR_ATTENDANCE_ENABLED ? akh_editor_attendance_open_shift_started_at_for($editor) : null;
 $attendanceSinceLabel = $attendanceSinceTs !== null ? date('M j, g:i A', $attendanceSinceTs) : '';
+$leavePendingCount = AKH_EDITOR_ATTENDANCE_ENABLED ? akh_editor_leave_pending_for_editor($editor) : 0;
 
 require_once AKH_ROOT . '/includes/header.php';
 ?>
@@ -159,6 +161,12 @@ require_once AKH_ROOT . '/includes/header.php';
                 <input type="hidden" name="action" value="attendance_clock_out" />
                 <button type="submit" class="btn btn--ghost btn--sm">Clock out</button>
               </form>
+            <?php endif; ?>
+            <?php if (AKH_EDITOR_ATTENDANCE_ENABLED): ?>
+              <a class="btn btn--ghost btn--sm" href="<?php echo h(base_path('editor/leave.php')); ?>">Apply leave</a>
+            <?php endif; ?>
+            <?php if ($leavePendingCount > 0): ?>
+              <span class="portal-muted" style="font-size:0.85rem"><?php echo (int) $leavePendingCount; ?> leave request(s) pending approval</span>
             <?php endif; ?>
           </div>
         </section>

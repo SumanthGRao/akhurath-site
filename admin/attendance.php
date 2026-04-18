@@ -5,16 +5,84 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 require_once AKH_ROOT . '/includes/admin-auth.php';
 require_once AKH_ROOT . '/includes/editor-attendance-report.php';
+require_once AKH_ROOT . '/includes/editor-leave.php';
+require_once AKH_ROOT . '/includes/csrf.php';
 
 akh_require_admin();
 
+$leaveErr = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!akh_csrf_verify($_POST['csrf_token'] ?? null)) {
+        $leaveErr = 'Security check failed. Refresh and try again.';
+    } else {
+        $act = (string) ($_POST['leave_action'] ?? '');
+        $id = trim((string) ($_POST['request_id'] ?? ''));
+        $ry = (int) ($_POST['redirect_year'] ?? date('Y'));
+        $rm = (int) ($_POST['redirect_month'] ?? date('n'));
+        if ($id !== '' && ($act === 'approve' || $act === 'reject')) {
+            $ok = akh_editor_leave_set_status($id, $act === 'approve' ? 'approved' : 'rejected');
+            if ($ok) {
+                header('Location: ' . base_path('admin/attendance.php?' . http_build_query(['year' => $ry, 'month' => $rm, 'ok' => '1'])));
+                exit;
+            }
+            $leaveErr = 'Could not update that request (already processed or missing).';
+        }
+    }
+}
+
+$dataClearErr = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_attendance_data_action'])) {
+    if (!akh_csrf_verify($_POST['csrf_token'] ?? null)) {
+        $dataClearErr = 'Security check failed. Refresh and try again.';
+    } else {
+        $dataAct = (string) ($_POST['admin_attendance_data_action'] ?? '');
+        $ry = max(2000, min(2100, (int) ($_POST['redirect_year'] ?? date('Y'))));
+        $rm = max(1, min(12, (int) ($_POST['redirect_month'] ?? date('n'))));
+        if ($dataAct === 'clear_attendance') {
+            $okBox = isset($_POST['confirm_delete_attendance_data']) && (string) ($_POST['confirm_delete_attendance_data'] ?? '') === '1';
+            if (!$okBox) {
+                $dataClearErr = 'Check the box to confirm deleting all attendance events.';
+            } elseif (!akh_editor_attendance_clear_all()) {
+                $dataClearErr = 'Could not clear attendance data.';
+            } else {
+                header('Location: ' . base_path('admin/attendance.php?' . http_build_query(['year' => $ry, 'month' => $rm, 'cleared' => 'attendance'])));
+                exit;
+            }
+        } elseif ($dataAct === 'clear_leave') {
+            $okBox = isset($_POST['confirm_delete_leave_data']) && (string) ($_POST['confirm_delete_leave_data'] ?? '') === '1';
+            if (!$okBox) {
+                $dataClearErr = 'Check the box to confirm deleting all leave requests.';
+            } elseif (!akh_editor_leave_clear_all()) {
+                $dataClearErr = 'Could not clear leave requests.';
+            } else {
+                header('Location: ' . base_path('admin/attendance.php?' . http_build_query(['year' => $ry, 'month' => $rm, 'cleared' => 'leave'])));
+                exit;
+            }
+        }
+    }
+}
+
 $y = (int) ($_GET['year'] ?? date('Y'));
 $m = (int) ($_GET['month'] ?? date('n'));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['redirect_year'])) {
+    $y = max(2000, min(2100, (int) $_POST['redirect_year']));
+    $m = max(1, min(12, (int) ($_POST['redirect_month'] ?? 1)));
+}
 $report = akh_editor_attendance_month_report($y, $m);
 $monthLabel = date('F Y', strtotime(sprintf('%04d-%02d-01', $report['year'], $report['month'])) ?: time());
+$pendingLeaves = akh_editor_leave_pending_list();
+$okBanner = (string) ($_GET['ok'] ?? '') === '1';
+$dataClearFlash = '';
+if ((string) ($_GET['cleared'] ?? '') === 'attendance') {
+    $dataClearFlash = 'All editor clock in/out events were deleted.';
+} elseif ((string) ($_GET['cleared'] ?? '') === 'leave') {
+    $dataClearFlash = 'All leave requests were deleted.';
+}
+$attEventsCount = count(akh_editor_attendance_read_doc()['events']);
+$leaveReqCount = count(akh_editor_leave_read()['requests']);
 
 $pageTitle = 'Editor attendance — ' . SITE_NAME;
-$bodyClass = 'page-portal admin-page admin-page--board admin-page--attendance';
+$bodyClass = 'page-portal admin-page admin-page--board admin-page--attendance admin-page--attendance-full';
 $adminNavActive = 'attendance.php';
 
 $years = range((int) date('Y'), (int) date('Y') - 2);
@@ -26,175 +94,159 @@ $months = [
 require_once AKH_ROOT . '/includes/header.php';
 ?>
 
-  <main id="main" class="portal-main portal-main--board">
-    <div class="portal-card portal-card--tasks admin-shell admin-attendance">
-      <header class="admin-head">
-        <div>
+  <main id="main" class="portal-main portal-main--board admin-attendance-main">
+    <div class="admin-attendance-fullwrap">
+      <header class="admin-head admin-attendance-fullhead admin-attendance-headerbar">
+        <div class="admin-attendance-headerbar__main">
           <h1 class="portal-title">Editor attendance</h1>
-          <p class="portal-lead admin-head__meta">Month view: Sundays off (grey). <strong class="atd-legend atd-legend--leave">Red</strong> = leave (no clock-in on a past Mon–Sat). <strong class="atd-legend atd-legend--short">Red line</strong> = worked but under the daily target (Mon–Fri <?php echo (int) AKH_ATTENDANCE_EXPECTED_HOURS; ?>h, <strong>Saturday half-day <?php echo (int) AKH_ATTENDANCE_EXPECTED_HOURS / 2; ?>h</strong>). <strong class="atd-legend atd-legend--9h">Green</strong> = full shift (Mon–Fri <?php echo (int) AKH_ATTENDANCE_FULL_SHIFT_HOURS; ?>h+, Sat <?php echo (int) AKH_ATTENDANCE_FULL_SHIFT_HOURS / 2; ?>h 30m+). Open shifts capped at 9h Mon–Fri and 4h 30m when started on Saturday.</p>
+          <p class="portal-lead admin-head__meta">One line per editor — open a name for the full calendar. <strong class="atd-legend atd-legend--leave">Red</strong> absent · <strong class="atd-legend atd-legend--pleave">Purple</strong> approved leave · Saturday half-day. <span class="admin-attendance-tz">All times <?php echo h(AKH_SITE_TIMEZONE === 'Asia/Kolkata' ? 'IST (Asia/Kolkata)' : AKH_SITE_TIMEZONE); ?>.</span></p>
         </div>
-        <p class="admin-head__actions">
-          <a class="btn btn--ghost btn--sm" href="<?php echo h(base_path('admin/logout.php')); ?>">Sign out</a>
-        </p>
+        <div class="admin-attendance-headerbar__right">
+          <form class="admin-attendance-cornerpicker" method="get" action="">
+            <label class="admin-attendance-cornerpicker__item"><span class="visually-hidden">Month</span>
+              <select name="month" aria-label="Month">
+                <?php foreach ($months as $num => $label): ?>
+                  <option value="<?php echo (int) $num; ?>"<?php echo $num === $report['month'] ? ' selected' : ''; ?>><?php echo h($label); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label class="admin-attendance-cornerpicker__item"><span class="visually-hidden">Year</span>
+              <select name="year" aria-label="Year">
+                <?php foreach ($years as $yr): ?>
+                  <option value="<?php echo (int) $yr; ?>"<?php echo $yr === $report['year'] ? ' selected' : ''; ?>><?php echo (int) $yr; ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <button type="submit" class="btn btn--primary btn--sm">Show</button>
+          </form>
+          <p class="admin-head__actions">
+            <a class="btn btn--ghost btn--sm" href="<?php echo h(base_path('admin/logout.php')); ?>">Sign out</a>
+          </p>
+        </div>
       </header>
 
       <?php require AKH_ROOT . '/includes/admin-nav.php'; ?>
 
-      <?php if (!AKH_EDITOR_ATTENDANCE_ENABLED): ?>
-        <p class="banner banner--info" role="status">Editor attendance is turned off in <code>includes/config.php</code> (<code>AKH_EDITOR_ATTENDANCE_ENABLED</code>). Turn it on to record clock-in/out from the editor task board.</p>
+      <?php if ($okBanner): ?>
+        <p class="banner banner--ok" role="status">Leave request updated.</p>
+      <?php endif; ?>
+      <?php if ($dataClearFlash !== ''): ?>
+        <p class="banner banner--ok" role="status"><?php echo h($dataClearFlash); ?></p>
+      <?php endif; ?>
+      <?php if ($leaveErr !== ''): ?>
+        <p class="banner banner--err" role="alert"><?php echo h($leaveErr); ?></p>
+      <?php endif; ?>
+      <?php if ($dataClearErr !== ''): ?>
+        <p class="banner banner--err" role="alert"><?php echo h($dataClearErr); ?></p>
       <?php endif; ?>
 
-      <form class="admin-attendance__picker portal-form" method="get" action="">
-        <label class="field">
-          <span>Month</span>
-          <select name="month">
-            <?php foreach ($months as $num => $label): ?>
-              <option value="<?php echo (int) $num; ?>"<?php echo $num === $report['month'] ? ' selected' : ''; ?>><?php echo h($label); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-        <label class="field">
-          <span>Year</span>
-          <select name="year">
-            <?php foreach ($years as $yr): ?>
-              <option value="<?php echo (int) $yr; ?>"<?php echo $yr === $report['year'] ? ' selected' : ''; ?>><?php echo (int) $yr; ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-        <button type="submit" class="btn btn--primary btn--sm">Show</button>
-      </form>
+      <?php if (!AKH_EDITOR_ATTENDANCE_ENABLED): ?>
+        <p class="banner banner--info" role="status">Editor attendance is turned off in <code>includes/config.php</code>.</p>
+      <?php endif; ?>
 
       <?php if ($report['editors'] === []): ?>
         <p class="portal-muted" style="margin-top:1rem">No editor accounts yet. Add editors under <a class="text-link" href="<?php echo h(base_path('admin/editors.php')); ?>">Editors</a>.</p>
       <?php endif; ?>
 
-      <?php foreach ($report['editors'] as $idx => $ed): ?>
-        <?php
-        $cells = $ed['cells'];
-        $firstTs = strtotime(sprintf('%04d-%02d-01 12:00:00', $report['year'], $report['month']));
-        $pad = $firstTs !== false ? (int) date('w', $firstTs) : 0;
-        $grid = [];
-        for ($i = 0; $i < $pad; ++$i) {
-            $grid[] = null;
-        }
-        foreach ($cells as $c) {
-            $grid[] = $c;
-        }
-        while (count($grid) % 7 !== 0) {
-            $grid[] = null;
-        }
-        $barP = $ed['bars'];
-        ?>
-        <article class="admin-attendance-card" style="--stagger: <?php echo (int) $idx; ?>">
-          <header class="admin-attendance-card__head">
-            <h2 class="admin-attendance-card__title"><?php echo h($ed['username']); ?></h2>
-            <p class="admin-attendance-card__sub"><?php echo h($monthLabel); ?></p>
-          </header>
+      <?php if ($pendingLeaves !== [] && AKH_EDITOR_ATTENDANCE_ENABLED): ?>
+        <section id="leave-queue" class="admin-attendance-leavequeue">
+          <h2 class="admin-attendance-leavequeue__title">Pending leave</h2>
+          <ul class="admin-attendance-leavequeue__list">
+            <?php foreach ($pendingLeaves as $req): ?>
+              <li class="admin-attendance-leavequeue__item">
+                <div>
+                  <strong><?php echo h((string) ($req['editor'] ?? '')); ?></strong>
+                  <span class="admin-attendance-leavequeue__date"><?php echo h((string) ($req['date'] ?? '')); ?></span>
+                  <?php if (trim((string) ($req['note'] ?? '')) !== ''): ?>
+                    <span class="admin-attendance-leavequeue__note"><?php echo h((string) ($req['note'] ?? '')); ?></span>
+                  <?php endif; ?>
+                </div>
+                <div class="admin-attendance-leavequeue__actions">
+                  <form method="post" action="" class="admin-attendance-leavequeue__form">
+                    <input type="hidden" name="csrf_token" value="<?php echo h(akh_csrf_token()); ?>" />
+                    <input type="hidden" name="request_id" value="<?php echo h((string) ($req['id'] ?? '')); ?>" />
+                    <input type="hidden" name="redirect_year" value="<?php echo (int) $report['year']; ?>" />
+                    <input type="hidden" name="redirect_month" value="<?php echo (int) $report['month']; ?>" />
+                    <button type="submit" name="leave_action" value="approve" class="btn btn--primary btn--sm">Approve</button>
+                    <button type="submit" name="leave_action" value="reject" class="btn btn--ghost btn--sm">Reject</button>
+                  </form>
+                </div>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        </section>
+      <?php endif; ?>
 
-          <div class="admin-attendance-stats" aria-label="Monthly totals for <?php echo h($ed['username']); ?>">
-            <div class="admin-attendance-stat admin-attendance-stat--pop">
-              <span class="admin-attendance-stat__value"><?php echo (int) $ed['present_working_days']; ?></span>
-              <span class="admin-attendance-stat__label">Present (Mon–Sat)</span>
+      <div class="admin-attendance-rows">
+        <?php foreach ($report['editors'] as $ed): ?>
+          <?php
+          $detailUrl = base_path('admin/attendance-detail.php?editor=' . rawurlencode((string) ($ed['username'] ?? '')) . '&year=' . (int) $report['year'] . '&month=' . (int) $report['month']);
+          $brief = (int) ($ed['present_working_days'] ?? 0) . ' pres · '
+              . (int) ($ed['days_under_8h'] ?? 0) . ' short · '
+              . (int) ($ed['leave_days'] ?? 0) . ' absent · '
+              . (int) ($ed['excused_leave_days'] ?? 0) . ' leave ok';
+          if (($ed['leave_pending_in_month'] ?? 0) > 0) {
+              $brief .= ' · ' . (int) $ed['leave_pending_in_month'] . ' leave pending';
+          }
+          $todayLine = akh_editor_attendance_today_summary((string) ($ed['username'] ?? ''));
+          ?>
+          <div class="admin-attendance-row">
+            <div class="admin-attendance-row__who">
+              <a class="admin-attendance-row__name" href="<?php echo h($detailUrl); ?>"><?php echo h((string) ($ed['username'] ?? '')); ?></a>
+              <span class="admin-attendance-row__month"><?php echo h($monthLabel); ?></span>
             </div>
-            <div class="admin-attendance-stat admin-attendance-stat--pop">
-              <span class="admin-attendance-stat__value"><?php echo (int) $ed['clock_in_days']; ?></span>
-              <span class="admin-attendance-stat__label">Days clocked in</span>
+            <div class="admin-attendance-row__today">
+              <span class="admin-attendance-row__k">Today</span>
+              <span class="admin-attendance-row__v"><?php echo h($todayLine); ?></span>
             </div>
-            <div class="admin-attendance-stat admin-attendance-stat--pop">
-              <span class="admin-attendance-stat__value"><?php echo (int) $ed['days_9h_plus']; ?></span>
-              <span class="admin-attendance-stat__label">Full-shift days</span>
-              <span class="admin-attendance-stat__hint">Mon–Fri <?php echo (int) AKH_ATTENDANCE_FULL_SHIFT_HOURS; ?>h+ · Sat 4h 30m+</span>
+            <div class="admin-attendance-row__brief">
+              <span class="admin-attendance-row__k">Month</span>
+              <span class="admin-attendance-row__v"><?php echo h($brief); ?></span>
             </div>
-            <div class="admin-attendance-stat admin-attendance-stat--pop<?php echo $ed['days_under_8h'] > 0 ? ' admin-attendance-stat--warn' : ''; ?>">
-              <span class="admin-attendance-stat__value"><?php echo (int) $ed['days_under_8h']; ?></span>
-              <span class="admin-attendance-stat__label">Under target</span>
-              <span class="admin-attendance-stat__hint">Mon–Fri &lt;<?php echo (int) AKH_ATTENDANCE_EXPECTED_HOURS; ?>h · Sat &lt;<?php echo (int) AKH_ATTENDANCE_EXPECTED_HOURS / 2; ?>h</span>
-            </div>
-            <div class="admin-attendance-stat admin-attendance-stat--pop<?php echo $ed['leave_days'] > 0 ? ' admin-attendance-stat--warn' : ''; ?>">
-              <span class="admin-attendance-stat__value"><?php echo (int) $ed['leave_days']; ?></span>
-              <span class="admin-attendance-stat__label">Leave days</span>
-            </div>
-            <div class="admin-attendance-stat admin-attendance-stat--pop admin-attendance-stat--muted">
-              <span class="admin-attendance-stat__value"><?php echo (int) $ed['sundays']; ?></span>
-              <span class="admin-attendance-stat__label">Sundays (off)</span>
+            <div class="admin-attendance-row__go">
+              <a class="btn btn--ghost btn--sm" href="<?php echo h($detailUrl); ?>">Details</a>
             </div>
           </div>
+        <?php endforeach; ?>
+      </div>
 
-          <div class="admin-attendance-bars" aria-hidden="true">
-            <div class="admin-attendance-bar">
-              <span class="admin-attendance-bar__label">Present / Mon–Sat</span>
-              <div class="admin-attendance-bar__track"><span class="admin-attendance-bar__fill admin-attendance-bar__fill--mint" style="--w: <?php echo (float) $barP['present_pct']; ?>%"></span></div>
-              <span class="admin-attendance-bar__pct"><?php echo h((string) $barP['present_pct']); ?>%</span>
-            </div>
-            <div class="admin-attendance-bar">
-              <span class="admin-attendance-bar__label">Clock-in / Mon–Sat</span>
-              <div class="admin-attendance-bar__track"><span class="admin-attendance-bar__fill admin-attendance-bar__fill--sky" style="--w: <?php echo (float) $barP['clock_pct']; ?>%"></span></div>
-              <span class="admin-attendance-bar__pct"><?php echo h((string) $barP['clock_pct']); ?>%</span>
-            </div>
-            <div class="admin-attendance-bar">
-              <span class="admin-attendance-bar__label">Full-shift met / Mon–Sat</span>
-              <div class="admin-attendance-bar__track"><span class="admin-attendance-bar__fill admin-attendance-bar__fill--green" style="--w: <?php echo (float) $barP['nine_pct']; ?>%"></span></div>
-              <span class="admin-attendance-bar__pct"><?php echo h((string) $barP['nine_pct']); ?>%</span>
-            </div>
+      <section class="portal-section admin-attendance-datapurge" aria-labelledby="admin-attendance-datapurge-h">
+        <h2 id="admin-attendance-datapurge-h" class="portal-section__title">Attendance &amp; leave data</h2>
+        <p class="portal-muted" style="margin:0 0 0.75rem">Permanently remove stored clock events or leave requests for every editor. Use after testing or before go-live.</p>
+        <?php if ($attEventsCount === 0 && $leaveReqCount === 0): ?>
+          <p class="portal-muted" style="margin:0">No clock events or leave requests on file.</p>
+        <?php else: ?>
+          <p class="portal-muted" style="margin:0 0 0.75rem">Currently <strong><?php echo (int) $attEventsCount; ?></strong> clock event<?php echo $attEventsCount === 1 ? '' : 's'; ?> and <strong><?php echo (int) $leaveReqCount; ?></strong> leave request<?php echo $leaveReqCount === 1 ? '' : 's'; ?>.</p>
+          <div class="admin-attendance-datapurge__forms">
+            <?php if ($attEventsCount > 0): ?>
+              <form class="admin-danger-zone" method="post" action="" onsubmit="return confirm('Delete all <?php echo (int) $attEventsCount; ?> clock in/out events for every editor? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="<?php echo h(akh_csrf_token()); ?>" />
+                <input type="hidden" name="admin_attendance_data_action" value="clear_attendance" />
+                <input type="hidden" name="redirect_year" value="<?php echo (int) $report['year']; ?>" />
+                <input type="hidden" name="redirect_month" value="<?php echo (int) $report['month']; ?>" />
+                <label class="admin-danger-zone__check">
+                  <input type="checkbox" name="confirm_delete_attendance_data" value="1" />
+                  <span>I understand this deletes <strong>every</strong> editor clock in/out record.</span>
+                </label>
+                <button type="submit" class="btn btn--ghost btn--sm admin-danger-zone__btn">Delete all attendance</button>
+              </form>
+            <?php endif; ?>
+            <?php if ($leaveReqCount > 0): ?>
+              <form class="admin-danger-zone" method="post" action="" onsubmit="return confirm('Delete all <?php echo (int) $leaveReqCount; ?> leave requests (any status)? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="<?php echo h(akh_csrf_token()); ?>" />
+                <input type="hidden" name="admin_attendance_data_action" value="clear_leave" />
+                <input type="hidden" name="redirect_year" value="<?php echo (int) $report['year']; ?>" />
+                <input type="hidden" name="redirect_month" value="<?php echo (int) $report['month']; ?>" />
+                <label class="admin-danger-zone__check">
+                  <input type="checkbox" name="confirm_delete_leave_data" value="1" />
+                  <span>I understand this deletes <strong>every</strong> leave request (pending, approved, and rejected).</span>
+                </label>
+                <button type="submit" class="btn btn--ghost btn--sm admin-danger-zone__btn">Delete all leave requests</button>
+              </form>
+            <?php endif; ?>
           </div>
-
-          <div class="admin-attendance-cal" role="grid" aria-label="Calendar for <?php echo h($ed['username']); ?>">
-            <div class="admin-attendance-cal__dow" role="row">
-              <?php foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $dow): ?>
-                <span role="columnheader"><?php echo h($dow); ?></span>
-              <?php endforeach; ?>
-            </div>
-            <?php
-            for ($row = 0; $row * 7 < count($grid); ++$row):
-                ?>
-            <div class="admin-attendance-cal__row" role="row">
-              <?php
-                for ($col = 0; $col < 7; ++$col):
-                    $slot = $row * 7 + $col;
-                    $c = $grid[$slot] ?? null;
-                    if ($c === null):
-                        ?>
-              <div class="atd atd--empty" role="gridcell"></div>
-                        <?php
-                    else:
-                        $classes = ['atd'];
-                        if ($c['sunday']) {
-                            $classes[] = 'atd--sun';
-                        } elseif ($c['future']) {
-                            $classes[] = 'atd--future';
-                        } elseif ($c['leave']) {
-                            $classes[] = 'atd--leave';
-                        } elseif ($c['under8']) {
-                            $classes[] = 'atd--short';
-                        } elseif ($c['nine_plus']) {
-                            $classes[] = 'atd--9h';
-                        } elseif (($c['expected_sec'] ?? 0) > 0
-                            && ($c['seconds'] ?? 0) >= ($c['expected_sec'] ?? 0)
-                            && ($c['seconds'] ?? 0) < ($c['full_shift_sec'] ?? PHP_INT_MAX)) {
-                            $classes[] = 'atd--ok';
-                        } elseif (($c['seconds'] ?? 0) > 0 || ($c['clock_in'] ?? false)) {
-                            $classes[] = 'atd--in';
-                        } else {
-                            $classes[] = 'atd--na';
-                        }
-                        if (!empty($c['today'])) {
-                            $classes[] = 'atd--today';
-                        }
-                        $hrs = akh_editor_attendance_format_hours((int) ($c['seconds'] ?? 0));
-                        ?>
-              <div class="<?php echo h(implode(' ', $classes)); ?>" role="gridcell" title="<?php echo h($c['ymd'] . ' — ' . $hrs); ?>">
-                <span class="atd__num"><?php echo (int) $c['dom']; ?></span>
-                <span class="atd__hrs"><?php echo h($hrs); ?></span>
-              </div>
-                        <?php
-                    endif;
-                endfor;
-                ?>
-            </div>
-            <?php endfor; ?>
-          </div>
-        </article>
-      <?php endforeach; ?>
+        <?php endif; ?>
+      </section>
     </div>
   </main>
 

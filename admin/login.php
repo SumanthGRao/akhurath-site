@@ -22,10 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pass = (string) ($_POST['password'] ?? '');
     if ($user === '' || $pass === '') {
         $error = 'Enter username and password.';
-    } elseif (akh_admin_accounts() === []) {
-        $error = 'No admin accounts are configured.';
     } elseif (!akh_admin_login($user, $pass)) {
-        $error = 'Invalid credentials.';
+        $error = (akh_admin_accounts() === [] && !akh_admin_dev_test_login_allowed())
+            ? 'No admin accounts are configured.'
+            : 'Invalid credentials.';
     } else {
         header('Location: ' . base_path('admin/index.php'));
         exit;
@@ -62,7 +62,13 @@ $showFirstSetup = AKH_ADMIN_SETUP_ENABLED && $noAdmins;
         </label>
         <button type="submit" class="btn btn--primary btn--block">Sign in</button>
       </form>
-      <p class="portal-foot"><a class="text-link" href="<?php echo h(base_path('index.php')); ?>">← Website home</a></p>
+      <p class="portal-foot">
+        <?php if (akh_admin_dev_test_login_allowed()): ?>
+          <a class="text-link" href="<?php echo h(base_path('admin/test-login.php')); ?>">Test login (UI, test / test)</a>
+          ·
+        <?php endif; ?>
+        <a class="text-link" href="<?php echo h(base_path('index.php')); ?>">← Website home</a>
+      </p>
     </div>
   </main>
 

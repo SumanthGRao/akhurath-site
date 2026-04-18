@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/editor-attendance.php';
 require_once __DIR__ . '/editor-auth.php';
+require_once __DIR__ . '/editor-leave.php';
 
 /** Below this many hours worked (with presence), the day is highlighted red. */
 const AKH_ATTENDANCE_EXPECTED_HOURS = 8;
@@ -170,7 +171,9 @@ function akh_editor_attendance_clock_in_dates(string $editor, array $eventsSorte
  *     days_9h_plus: int,
  *     days_under_8h: int,
  *     leave_days: int,
- *     cells: list<array{ymd: string, dom: int, w: int, label: string, seconds: int, clock_in: bool, sunday: bool, leave: bool, under8: bool, nine_plus: bool, future: bool, today: bool, expected_sec: int, full_shift_sec: int}>,
+ *     excused_leave_days: int,
+ *     leave_pending_in_month: int,
+ *     cells: list<array{ymd: string, dom: int, w: int, label: string, seconds: int, clock_in: bool, sunday: bool, leave: bool, under8: bool, nine_plus: bool, future: bool, today: bool, expected_sec: int, full_shift_sec: int, pleave: bool}>,
  *     bars: array{present_pct: float, clock_pct: float, nine_pct: float}
  *   }>
  * }
@@ -202,6 +205,8 @@ function akh_editor_attendance_month_report(int $year, int $month): array
     ];
 
     foreach ($editors as $editor) {
+        $approvedSet = akh_editor_leave_approved_dates_in_month($editor, $year, $month);
+        $leaveMonthCounts = akh_editor_leave_counts_for_month_editor($editor, $year, $month);
         $intervals = akh_editor_attendance_work_intervals($editor, $events);
         $secondsByDay = akh_editor_attendance_seconds_by_day($intervals, $monthStart, $monthEnd);
         $clockInDates = akh_editor_attendance_clock_in_dates($editor, $events, $monthStart, $monthEnd);
@@ -235,16 +240,18 @@ function akh_editor_attendance_month_report(int $year, int $month): array
                 ++$workingDays;
             }
 
+            $pleave = isset($approvedSet[$ymd]);
+
             $leave = false;
             if ($isWorkingDay && !$isFuture && $ymd < $todayYmd) {
-                if ($seconds < 1 && !$hadClockIn) {
+                if (!$pleave && $seconds < 1 && !$hadClockIn) {
                     $leave = true;
                     ++$leaveDays;
                 }
             }
 
             $under = false;
-            if ($isWorkingDay && $expectedSec > 0 && $seconds > 0 && $seconds < $expectedSec) {
+            if (!$pleave && $isWorkingDay && $expectedSec > 0 && $seconds > 0 && $seconds < $expectedSec) {
                 if ($ymd < $todayYmd) {
                     $under = true;
                     ++$under8;
@@ -278,6 +285,7 @@ function akh_editor_attendance_month_report(int $year, int $month): array
                 'today' => $isToday,
                 'expected_sec' => $expectedSec,
                 'full_shift_sec' => $fullShiftSec,
+                'pleave' => $pleave,
             ];
         }
 
@@ -297,6 +305,8 @@ function akh_editor_attendance_month_report(int $year, int $month): array
             'days_9h_plus' => $ninePlus,
             'days_under_8h' => $under8,
             'leave_days' => $leaveDays,
+            'excused_leave_days' => count($approvedSet),
+            'leave_pending_in_month' => $leaveMonthCounts['pending'],
             'cells' => $cells,
             'bars' => $bars,
         ];
@@ -314,4 +324,79 @@ function akh_editor_attendance_format_hours(int $sec): string
     $m = intdiv($sec % 3600, 60);
 
     return $m === 0 ? $h . 'h' : $h . 'h ' . $m . 'm';
+}
+
+/** One-line summary for the list view (plain text). */
+function akh_editor_attendance_today_summary(string $editor): string
+{
+    $today = date('Y-m-d');
+    $start = strtotime($today . ' 00:00:00');
+    $end = strtotime($today . ' 23:59:59');
+    if ($start === false || $end === false) {
+        return '—';
+    }
+    $key = strtolower(trim($editor));
+    $events = akh_editor_attendance_events_sorted();
+    $ins = [];
+    $outs = [];
+    foreach ($events as $e) {
+        if (($e['editor'] ?? '') !== $key) {
+            continue;
+        }
+        $at = (int) ($e['at'] ?? 0);
+        if ($at < $start || $at > $end) {
+            continue;
+        }
+        if (($e['type'] ?? '') === 'clock_in') {
+            $ins[] = $at;
+        }
+        if (($e['type'] ?? '') === 'clock_out') {
+            $outs[] = $at;
+        }
+    }
+    sort($ins);
+    sort($outs);
+    $on = akh_editor_attendance_is_clocked_in($editor);
+    $firstIn = $ins[0] ?? null;
+    $lastOut = $outs !== [] ? $outs[count($outs) - 1] : null;
+    if ($firstIn === null) {
+        return 'No punches today';
+    }
+    $inStr = date('g:i A', $firstIn);
+    if ($on) {
+        return 'In ' . $inStr . ' · on shift';
+    }
+    if ($lastOut !== null && $lastOut >= $firstIn) {
+        return 'In ' . $inStr . ' · Out ' . date('g:i A', $lastOut);
+    }
+
+    return 'In ' . $inStr;
+}
+
+/**
+ * @return array{pending: int, approved: int}
+ */
+function akh_editor_leave_counts_for_month_editor(string $editor, int $year, int $month): array
+{
+    $key = strtolower(trim($editor));
+    $pfx = sprintf('%04d-%02d-', $year, $month);
+    $pending = 0;
+    $approved = 0;
+    foreach (akh_editor_leave_read()['requests'] as $r) {
+        if (($r['editor'] ?? '') !== $key) {
+            continue;
+        }
+        $d = (string) ($r['date'] ?? '');
+        if (!str_starts_with($d, $pfx)) {
+            continue;
+        }
+        if (($r['status'] ?? '') === 'pending') {
+            ++$pending;
+        }
+        if (($r['status'] ?? '') === 'approved') {
+            ++$approved;
+        }
+    }
+
+    return ['pending' => $pending, 'approved' => $approved];
 }

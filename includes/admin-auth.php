@@ -24,11 +24,39 @@ function akh_admin_current(): ?string
     return is_string($u) && $u !== '' ? $u : null;
 }
 
+/** True when the HTTP client appears to be the same machine (PHP built-in server, local Apache, etc.). */
+function akh_admin_request_is_loopback(): bool
+{
+    $addr = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+
+    return $addr === '127.0.0.1' || $addr === '::1';
+}
+
+/**
+ * When true, admin accepts username/password `test`/`test` without data/admins.php (UI / local dev).
+ * Enabled if: AKH_ADMIN_DEV_TEST_LOGIN, or AKH_DEV_TEST_LOGIN, or loopback with no admin accounts yet.
+ */
+function akh_admin_dev_test_login_allowed(): bool
+{
+    if (AKH_ADMIN_DEV_TEST_LOGIN || AKH_DEV_TEST_LOGIN) {
+        return true;
+    }
+
+    return akh_admin_request_is_loopback() && akh_admin_accounts() === [];
+}
+
 function akh_admin_login(string $username, string $password): bool
 {
     $key = strtolower(trim($username));
     if ($key === '') {
         return false;
+    }
+
+    if (akh_admin_dev_test_login_allowed() && $key === 'test' && $password === 'test') {
+        session_regenerate_id(true);
+        $_SESSION['akh_admin_user'] = 'test';
+
+        return true;
     }
 
     $accounts = akh_admin_accounts();

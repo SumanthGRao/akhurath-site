@@ -220,6 +220,40 @@ function akh_editor_attendance_append(string $editor, string $type): bool
     return true;
 }
 
+/** Remove all clock in/out events (admin / production reset). */
+function akh_editor_attendance_clear_all(): bool
+{
+    $path = akh_editor_attendance_file();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+        return false;
+    }
+    $fp = @fopen($path, 'c+');
+    if ($fp === false) {
+        return false;
+    }
+    if (!flock($fp, LOCK_EX)) {
+        fclose($fp);
+
+        return false;
+    }
+    try {
+        $doc = akh_editor_attendance_default_doc();
+        $out = json_encode($doc, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, $out);
+        fflush($fp);
+    } catch (\Throwable $e) {
+        return false;
+    } finally {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+
+    return true;
+}
+
 function akh_editor_attendance_auto_clock_out_on_logout(string $editor): void
 {
     if (!AKH_EDITOR_ATTENDANCE_ENABLED) {

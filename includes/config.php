@@ -13,6 +13,9 @@ define('AKH_ROOT', dirname(__DIR__));
  */
 const BASE_URL = '';
 
+/** PHP default timezone (IST) for attendance, dashboards, and all displayed clock times. */
+const AKH_SITE_TIMEZONE = 'Asia/Kolkata';
+
 /**
  * PHP session lifetime (seconds) for admin, editor, and client portals: cookie max-age and
  * session.gc_maxlifetime. Default 9 hours. Each request refreshes the cookie (sliding window).
@@ -29,6 +32,12 @@ const AKH_EDITOR_ATTENDANCE_ENABLED = true;
  * Leave false in production; use data/customers.php and data/editors.php with real password hashes.
  */
 const AKH_DEV_TEST_LOGIN = false;
+
+/**
+ * When true, admin accepts `test`/`test` without admins.php (also when AKH_DEV_TEST_LOGIN is true, or on 127.0.0.1/::1 with no admins).
+ * Set true for explicit dev; keep false in production if you never use loopback admin.
+ */
+const AKH_ADMIN_DEV_TEST_LOGIN = false;
 
 /**
  * When true, /customer/register.php lets visitors create a client account (writes data/customers.php).

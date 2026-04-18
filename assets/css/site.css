@@ -3499,6 +3499,7 @@ body.page-home .site-header:not(.site-header--solid) .site-menu__list .site-menu
 .admin-nav {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem 1rem;
   padding: 0.75rem 0 1.25rem;
   margin: 0 0 1.25rem;
@@ -3777,6 +3778,18 @@ body.page-home .site-header:not(.site-header--solid) .site-menu__list .site-menu
 
 .admin-danger-zone__btn {
   color: #7a2a22;
+}
+
+.admin-attendance-datapurge {
+  margin-top: 2rem;
+}
+
+.admin-attendance-datapurge__forms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+  max-width: 42rem;
 }
 
 .admin-overview__hero {
@@ -4386,17 +4399,60 @@ body.page-home .site-header:not(.site-header--solid) .site-menu__list .site-menu
   max-width: min(64rem, 100%);
 }
 
-.admin-attendance__picker {
-  display: flex;
+/* Month/year in header corner — single horizontal row */
+.admin-attendance-headerbar.admin-head {
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.75rem 1rem;
-  align-items: flex-end;
-  margin: 1rem 0 0.5rem;
-  max-width: 38rem;
 }
 
-.admin-attendance__picker .field {
-  margin-bottom: 0;
+.admin-attendance-headerbar__main {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.admin-attendance-headerbar__right {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.admin-attendance-headerbar__right .admin-head__actions {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-attendance-cornerpicker {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.admin-attendance-cornerpicker__item {
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.admin-attendance-cornerpicker select {
+  min-width: 5.5rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.admin-attendance-tz {
+  opacity: 0.85;
+  font-weight: 400;
 }
 
 .admin-attendance-card {
@@ -4774,4 +4830,311 @@ body.page-home .site-header:not(.site-header--solid) .site-menu__list .site-menu
 
 .atd:hover:not(.atd--empty) {
   transform: translateY(-1px);
+}
+
+.atd--pleave {
+  background: linear-gradient(160deg, rgba(120, 80, 180, 0.28), rgba(90, 55, 140, 0.42));
+  border-color: rgba(100, 70, 160, 0.45);
+  color: #fff;
+}
+
+.atd--pleave .atd__hrs {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+}
+
+.atd-legend--pleave {
+  color: #6b4c9a;
+}
+
+.admin-leave-bell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.55rem;
+  margin-right: 0.35rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(200, 120, 60, 0.45);
+  background: rgba(220, 140, 70, 0.14);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1;
+  animation: adminLeaveBellNudge 2.5s ease-in-out infinite;
+}
+
+@keyframes adminLeaveBellNudge {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-8deg);
+  }
+  40% {
+    transform: rotate(8deg);
+  }
+}
+
+.admin-leave-bell:hover,
+.admin-leave-bell:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.admin-leave-bell__icon {
+  display: flex;
+  line-height: 0;
+}
+
+.admin-leave-bell__count {
+  min-width: 1.1rem;
+  text-align: center;
+}
+
+.admin-page--attendance-full .portal-main--board.admin-attendance-main,
+.admin-page--attendance-full.admin-attendance-main {
+  max-width: 100%;
+  width: 100%;
+  padding-left: clamp(0.65rem, 2vw, 1.25rem);
+  padding-right: clamp(0.65rem, 2vw, 1.25rem);
+  box-sizing: border-box;
+}
+
+.admin-page--attendance-full .portal-card--tasks,
+.admin-page--attendance-full .admin-shell {
+  max-width: none;
+  width: 100%;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.admin-attendance-fullwrap {
+  width: 100%;
+  max-width: min(118rem, 100%);
+  margin: 0 auto;
+  padding-bottom: 2.5rem;
+}
+
+.admin-attendance-fullhead {
+  margin-bottom: 0.25rem;
+}
+
+.admin-attendance-rows {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.admin-attendance-row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 9rem) minmax(10rem, 1.1fr) minmax(12rem, 1.4fr) auto;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  animation: adminAttRowIn 0.45s ease backwards;
+}
+
+.admin-attendance-row:nth-child(1) {
+  animation-delay: 0.03s;
+}
+.admin-attendance-row:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.admin-attendance-row:nth-child(3) {
+  animation-delay: 0.09s;
+}
+.admin-attendance-row:nth-child(4) {
+  animation-delay: 0.12s;
+}
+.admin-attendance-row:nth-child(5) {
+  animation-delay: 0.15s;
+}
+.admin-attendance-row:nth-child(6) {
+  animation-delay: 0.18s;
+}
+
+.admin-attendance-row:last-child {
+  border-bottom: none;
+}
+
+@keyframes adminAttRowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 52rem) {
+  .admin-attendance-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .admin-attendance-row__go {
+    justify-self: start;
+  }
+}
+
+.admin-attendance-row__name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.admin-attendance-row__name:hover,
+.admin-attendance-row__name:focus-visible {
+  color: var(--accent-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-attendance-row__month {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.admin-attendance-row__k {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.admin-attendance-row__v {
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.admin-attendance-leavequeue {
+  margin: 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: rgba(255, 200, 120, 0.08);
+}
+
+.admin-attendance-leavequeue__title {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+}
+
+.admin-attendance-leavequeue__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-attendance-leavequeue__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-attendance-leavequeue__item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.admin-attendance-leavequeue__date {
+  margin-left: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.admin-attendance-leavequeue__note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.admin-attendance-leavequeue__actions {
+  flex-shrink: 0;
+}
+
+.admin-attendance-leavequeue__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-attendance-detailcard {
+  margin-top: 1rem;
+}
+
+.editor-leave-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.editor-leave-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.editor-leave-list__item:last-child {
+  border-bottom: none;
+}
+
+.editor-leave-list__st {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.editor-leave-list__st--pending {
+  background: rgba(200, 140, 40, 0.2);
+}
+
+.editor-leave-list__st--approved {
+  background: rgba(50, 140, 90, 0.2);
+}
+
+.editor-leave-list__st--rejected {
+  background: rgba(180, 60, 60, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-leave-bell {
+    animation: none;
+  }
+
+  .admin-attendance-row {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
