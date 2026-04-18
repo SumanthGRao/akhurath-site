@@ -118,9 +118,28 @@ $barP = $ed['bars'];
                           $classes[] = 'atd--today';
                       }
                       $hrs = akh_editor_attendance_format_hours((int) ($c['seconds'] ?? 0));
+                      $pi = $c['punch_in'] ?? null;
+                      $po = $c['punch_out'] ?? null;
+                      $tip = $c['ymd'] . ' — ' . $hrs;
+                      if ($pi !== null && $pi !== '') {
+                          $tip .= ' · In ' . $pi;
+                      }
+                      if ($po !== null && $po !== '') {
+                          $tip .= ' · Out ' . $po;
+                      }
                       ?>
-              <div class="<?php echo h(implode(' ', $classes)); ?>" role="gridcell" title="<?php echo h($c['ymd'] . ' — ' . $hrs); ?>">
+              <div class="<?php echo h(implode(' ', $classes)); ?>" role="gridcell" title="<?php echo h($tip); ?>">
                 <span class="atd__num"><?php echo (int) $c['dom']; ?></span>
+                <?php if (($pi !== null && $pi !== '') || ($po !== null && $po !== '')): ?>
+                  <div class="atd__punches">
+                    <?php if ($pi !== null && $pi !== ''): ?>
+                      <span class="atd__punch atd__punch--in"><?php echo h($pi); ?></span>
+                    <?php endif; ?>
+                    <?php if ($po !== null && $po !== ''): ?>
+                      <span class="atd__punch atd__punch--out"><?php echo h($po); ?></span>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
                 <span class="atd__hrs"><?php echo h(!empty($c['pleave']) ? 'Leave' : $hrs); ?></span>
               </div>
                   <?php endif;

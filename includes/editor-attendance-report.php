@@ -158,6 +158,47 @@ function akh_editor_attendance_clock_in_dates(string $editor, array $eventsSorte
 }
 
 /**
+ * First clock-in and last clock-out on a calendar day (site timezone), for calendar cells.
+ *
+ * @param list<array{editor: string, type: string, at: int}> $eventsSorted
+ * @return array{in: ?string, out: ?string}
+ */
+function akh_editor_attendance_day_punch_labels(string $editor, string $ymd, array $eventsSorted): array
+{
+    $key = strtolower(trim($editor));
+    if ($key === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+        return ['in' => null, 'out' => null];
+    }
+    $start = strtotime($ymd . ' 00:00:00');
+    $end = strtotime($ymd . ' 23:59:59');
+    if ($start === false || $end === false) {
+        return ['in' => null, 'out' => null];
+    }
+    $firstIn = null;
+    $lastOut = null;
+    foreach ($eventsSorted as $e) {
+        if (($e['editor'] ?? '') !== $key) {
+            continue;
+        }
+        $at = (int) ($e['at'] ?? 0);
+        if ($at < $start || $at > $end) {
+            continue;
+        }
+        $ty = (string) ($e['type'] ?? '');
+        if ($ty === 'clock_in') {
+            $firstIn = $firstIn === null ? $at : min($firstIn, $at);
+        } elseif ($ty === 'clock_out') {
+            $lastOut = $lastOut === null ? $at : max($lastOut, $at);
+        }
+    }
+
+    return [
+        'in' => $firstIn !== null ? date('g:i A', $firstIn) : null,
+        'out' => $lastOut !== null ? date('g:i A', $lastOut) : null,
+    ];
+}
+
+/**
  * @return array{
  *   year: int,
  *   month: int,
@@ -173,7 +214,7 @@ function akh_editor_attendance_clock_in_dates(string $editor, array $eventsSorte
  *     leave_days: int,
  *     excused_leave_days: int,
  *     leave_pending_in_month: int,
- *     cells: list<array{ymd: string, dom: int, w: int, label: string, seconds: int, clock_in: bool, sunday: bool, leave: bool, under8: bool, nine_plus: bool, future: bool, today: bool, expected_sec: int, full_shift_sec: int, pleave: bool}>,
+ *     cells: list<array{ymd: string, dom: int, w: int, label: string, seconds: int, clock_in: bool, sunday: bool, leave: bool, under8: bool, nine_plus: bool, future: bool, today: bool, expected_sec: int, full_shift_sec: int, pleave: bool, punch_in: ?string, punch_out: ?string}>,
  *     bars: array{present_pct: float, clock_pct: float, nine_pct: float}
  *   }>
  * }
@@ -270,6 +311,8 @@ function akh_editor_attendance_month_report(int $year, int $month): array
                 ++$presentWorkingDays;
             }
 
+            $punch = akh_editor_attendance_day_punch_labels($editor, $ymd, $events);
+
             $cells[] = [
                 'ymd' => $ymd,
                 'dom' => $d,
@@ -286,6 +329,8 @@ function akh_editor_attendance_month_report(int $year, int $month): array
                 'expected_sec' => $expectedSec,
                 'full_shift_sec' => $fullShiftSec,
                 'pleave' => $pleave,
+                'punch_in' => $punch['in'],
+                'punch_out' => $punch['out'],
             ];
         }
 

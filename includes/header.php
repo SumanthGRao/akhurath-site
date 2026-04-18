@@ -15,7 +15,12 @@ $bodyClass = $bodyClass ?? '';
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="<?php echo h(base_path('assets/css/site.css')); ?>" />
+  <?php
+    $akhCssPath = defined('AKH_ROOT') ? AKH_ROOT . '/assets/css/site.css' : '';
+    $akhCssVer = ($akhCssPath !== '' && is_file($akhCssPath)) ? (string) filemtime($akhCssPath) : '';
+    $akhCssHref = base_path('assets/css/site.css') . ($akhCssVer !== '' ? '?v=' . rawurlencode($akhCssVer) : '');
+  ?>
+  <link rel="stylesheet" href="<?php echo h($akhCssHref); ?>" />
 </head>
 <body class="<?php echo h($bodyClass); ?>">
   <a class="skip-link" href="#main">Skip to content</a>
