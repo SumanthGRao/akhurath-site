@@ -36,6 +36,33 @@ otherwise the site login is separate from the drive login (dashboard explains th
 
 Nginx: .htaccess inside /data/ is ignored. Deny /data/ in your server block or move secrets outside the web root.
 
+Admin console — production (/admin/login.php)
+---------------------------------------------
+Default after seeding: username `admin`, password `admin@123` (change in scripts/seed-admin-console.php before running if you want something else).
+
+If you see "Invalid credentials" on the live site, the server usually has no `data/admins.php`, an old file (different user/password), or a wrong path — fix with ONE of these:
+
+  A) SSH + PHP CLI (best if your host allows it)
+     cd /path/to/site   # same folder that contains includes/ and data/
+     php scripts/seed-admin-console.php
+     Confirm data/admins.php exists and is readable by the web user.
+
+  B) No SSH — seed on your Mac, then upload
+     Locally: php scripts/seed-admin-console.php
+     Upload the generated data/admins.php to the server’s data/ folder (SFTP / cPanel File Manager).
+     Permissions: same as other PHP files (often 644); folder data/ must exist.
+
+  C) Custom password (no editing the seed script)
+     php scripts/hash-password.php 'YourLongPassword'
+     Copy data/admins.example.php to data/admins.php on the server, edit the return array to:
+       'admin' => 'paste_the_hash_line_here',
+     (username key must be lowercase; login accepts any case.)
+
+  D) Deploy from Git
+     If data/admins.php is committed (see .gitignore), pull/deploy the repo so that file lands on the server. Re-run the seed script locally and commit again whenever you rotate the password.
+
+After any option: open /admin/login.php and sign in. Keep data/ out of public URLs; Apache uses data/.htaccess; on Nginx block /data/ explicitly.
+
 Phase 3 (later) — Polish & integrations
 ---------------------------------------
 - Swap placeholder portfolio entries; add testimonial videos or quotes.

@@ -7,3 +7,4 @@
 !/data/.htaccess
 !/data/*.example.php
 !/data/tasks.example.json
+!/data/admins.php

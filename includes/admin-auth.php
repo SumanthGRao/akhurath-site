@@ -61,3 +61,43 @@ function akh_require_admin(): void
         exit;
     }
 }
+
+/**
+ * @param array<string, string> $accounts lowercase username => password_hash
+ */
+function akh_admin_save_accounts(array $accounts): bool
+{
+    $target = AKH_ROOT . '/data/admins.php';
+    $dir = dirname($target);
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+        return false;
+    }
+    ksort($accounts);
+    $body = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($accounts, true) . ";\n";
+    $tmp = $target . '.tmp';
+    if (file_put_contents($tmp, $body) === false) {
+        return false;
+    }
+    if (!@rename($tmp, $target)) {
+        @unlink($tmp);
+
+        return false;
+    }
+
+    return true;
+}
+
+function akh_admin_update_password_hash(string $username, string $newHash): bool
+{
+    $key = strtolower(trim($username));
+    if ($key === '' || $newHash === '') {
+        return false;
+    }
+    $accounts = akh_admin_accounts();
+    if (!isset($accounts[$key])) {
+        return false;
+    }
+    $accounts[$key] = $newHash;
+
+    return akh_admin_save_accounts($accounts);
+}

@@ -5,7 +5,10 @@ declare(strict_types=1);
 
 /**
  * Usage: php scripts/hash-password.php 'YourPassword'
- * Paste the output into data/customers.php as the value for a username key.
+ * Paste the single-line hash into:
+ *   - data/customers.php (client username => hash), or
+ *   - data/admins.php (admin username => hash), or
+ *   - data/editors.php (editor username => hash).
  */
 $pw = $argv[1] ?? '';
 if ($pw === '') {

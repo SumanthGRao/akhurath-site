@@ -4,7 +4,14 @@
 declare(strict_types=1);
 
 /**
- * Writes data/admins.php with a bcrypt hash for the default admin.
+ * Writes data/admins.php with a bcrypt hash for the studio admin console.
+ *
+ * Default credentials (local and production): username `admin`, password `admin@123`.
+ * Run once per environment (or after rotating the password), then deploy with `data/admins.php`
+ * committed or copied to the server — it contains only a hash, not plaintext.
+ *
+ * Alternatively, with no admins yet, use Admin → Create first admin (admin/setup.php) if
+ * AKH_ADMIN_SETUP_ENABLED is true; notification email lives in data/admin-meta.php via Account.
  */
 
 $root = dirname(__DIR__);

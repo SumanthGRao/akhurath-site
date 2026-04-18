@@ -10,8 +10,6 @@ $metaDescription = 'Staff task board for ' . SITE_NAME . '.';
 $bodyClass = 'page-portal';
 
 $error = '';
-$accountsFile = AKH_ROOT . '/data/editors.php';
-$accountsReady = is_file($accountsFile);
 
 if (akh_editor_current() !== null) {
     header('Location: ' . base_path('editor/dashboard.php'));
@@ -25,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($user === '' || $pass === '') {
         $error = 'Enter username and password.';
     } elseif (akh_editor_accounts() === [] && !AKH_DEV_TEST_LOGIN) {
-        $error = 'No editor accounts are defined. Create data/editors.php (see data/editors.example.php).';
+        $error = 'No editor accounts are configured.';
     } elseif (!akh_editor_login($user, $pass)) {
         $error = 'Invalid username or password.';
     } else {
@@ -41,10 +39,6 @@ require_once AKH_ROOT . '/includes/header.php';
     <div class="portal-card">
       <h1 class="portal-title">Editor login</h1>
       <p class="portal-lead">Assign incoming client tasks to yourself and update status. This is separate from the client portal.</p>
-
-      <?php if (!$accountsReady && !AKH_DEV_TEST_LOGIN): ?>
-        <p class="banner banner--info" role="status">Setup: copy <code>data/editors.example.php</code> to <code>data/editors.php</code> with password hashes (same workflow as client accounts).</p>
-      <?php endif; ?>
 
       <?php if ($error !== ''): ?>
         <p class="banner banner--err" role="alert"><?php echo h($error); ?></p>
