@@ -7,6 +7,7 @@
 !/data/.htaccess
 !/data/*.example.php
 !/data/tasks.example.json
+!/data/customer-emails.example.json
 !/data/editor-attendance.example.json
 !/data/editor-leave.example.json
 !/data/admins.php

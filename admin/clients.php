@@ -36,7 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $u = trim((string) ($_POST['new_username'] ?? ''));
             $p = (string) ($_POST['new_password'] ?? '');
             $p2 = (string) ($_POST['new_password_confirm'] ?? '');
-            $err = akh_customer_admin_add($u, $p, $p2);
+            $em = trim((string) ($_POST['new_email'] ?? ''));
+            $err = akh_customer_admin_add($u, $p, $p2, $em);
             if ($err !== null) {
                 $error = $err;
             } else {
@@ -85,6 +86,10 @@ require_once AKH_ROOT . '/includes/header.php';
             <label class="field">
               <span>Username</span>
               <input type="text" name="new_username" required maxlength="32" pattern="[a-z][a-z0-9_]{2,31}" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Contact email</span>
+              <input type="email" name="new_email" maxlength="120" autocomplete="off" placeholder="Optional — for task notifications" />
             </label>
             <label class="field">
               <span>Password</span>

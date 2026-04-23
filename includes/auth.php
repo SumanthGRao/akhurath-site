@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/customer-email-store.php';
+
 /**
  * @return array<string, string> username => password_hash
  */
@@ -42,7 +44,7 @@ function akh_customer_write_accounts_file(array $accounts): bool
 /**
  * Register a new client account. Returns null on success, or an error message.
  */
-function akh_customer_register(string $username, string $password, string $passwordConfirm): ?string
+function akh_customer_register(string $username, string $email, string $password, string $passwordConfirm): ?string
 {
     if (!AKH_ALLOW_CLIENT_REGISTRATION) {
         return 'Registration is closed. Please contact the studio.';
@@ -68,6 +70,11 @@ function akh_customer_register(string $username, string $password, string $passw
         return 'Passwords do not match.';
     }
 
+    $email = strtolower(trim($email));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 120) {
+        return 'Please enter a valid email address for confirmations and task updates.';
+    }
+
     $lockPath = AKH_ROOT . '/data/.customers-register.lock';
     $lockFp = fopen($lockPath, 'c');
     if ($lockFp === false) {
@@ -88,6 +95,12 @@ function akh_customer_register(string $username, string $password, string $passw
         if (!akh_customer_write_accounts_file($accounts)) {
             return 'Could not save your account. Check server permissions on the data/ folder.';
         }
+        if (!akh_customer_email_set($username, $email)) {
+            unset($accounts[$username]);
+            akh_customer_write_accounts_file($accounts);
+
+            return 'Could not save your contact email. Try again.';
+        }
     } finally {
         flock($lockFp, LOCK_UN);
         fclose($lockFp);
@@ -101,7 +114,7 @@ function akh_customer_register(string $username, string $password, string $passw
  *
  * @return string|null error or null on success
  */
-function akh_customer_admin_add(string $username, string $password, string $passwordConfirm): ?string
+function akh_customer_admin_add(string $username, string $password, string $passwordConfirm, string $contactEmail = ''): ?string
 {
     $username = strtolower(trim($username));
     if (!preg_match('/^[a-z][a-z0-9_]{2,31}$/', $username)) {
@@ -143,6 +156,21 @@ function akh_customer_admin_add(string $username, string $password, string $pass
         if (!akh_customer_write_accounts_file($accounts)) {
             return 'Could not save accounts. Check data/ permissions.';
         }
+        $ce = strtolower(trim($contactEmail));
+        if ($ce !== '') {
+            if (!filter_var($ce, FILTER_VALIDATE_EMAIL) || mb_strlen($ce) > 120) {
+                unset($accounts[$username]);
+                akh_customer_write_accounts_file($accounts);
+
+                return 'Invalid contact email.';
+            }
+            if (!akh_customer_email_set($username, $ce)) {
+                unset($accounts[$username]);
+                akh_customer_write_accounts_file($accounts);
+
+                return 'Could not save contact email.';
+            }
+        }
     } finally {
         flock($lockFp, LOCK_UN);
         fclose($lockFp);
@@ -173,6 +201,7 @@ function akh_customer_delete(string $username): bool
         if (!akh_customer_write_accounts_file($accounts)) {
             return false;
         }
+        akh_customer_email_delete($key);
     } finally {
         flock($lockFp, LOCK_UN);
         fclose($lockFp);

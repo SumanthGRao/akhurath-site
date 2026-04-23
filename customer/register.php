@@ -39,12 +39,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && AKH_ALLOW_CLIENT_REGISTRATI
         } else {
             try {
                 $user = trim((string) ($_POST['username'] ?? ''));
+                $email = trim((string) ($_POST['email'] ?? ''));
                 $pass = (string) ($_POST['password'] ?? '');
                 $pass2 = (string) ($_POST['password_confirm'] ?? '');
-                $err = akh_customer_register($user, $pass, $pass2);
+                $err = akh_customer_register($user, $email, $pass, $pass2);
                 if ($err !== null) {
                     $error = $err;
                 } else {
+                    require_once AKH_ROOT . '/includes/site-notify-mail.php';
+                    $em = strtolower(trim($email));
+                    if ($em !== '' && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+                        akh_site_mail_client_registration_welcome($em, strtolower(trim($user)));
+                        akh_site_mail_studio_new_client(strtolower(trim($user)), $em);
+                    }
                     header('Location: ' . base_path('customer/login.php?registered=1'));
                     exit;
                 }
@@ -66,7 +73,7 @@ require_once AKH_ROOT . '/includes/header.php';
         <p class="banner banner--err" role="alert">New registrations are disabled. Email <a class="text-link" href="mailto:<?php echo h(CONTACT_EMAIL); ?>"><?php echo h(CONTACT_EMAIL); ?></a> to get access.</p>
         <p class="portal-foot"><a class="text-link" href="<?php echo h(base_path('customer/login.php')); ?>">← Client login</a></p>
       <?php else: ?>
-        <p class="portal-lead">Choose a username and password. You’ll use these to log in, submit tasks, and track status. Usernames are lowercase letters, numbers, and underscores only.</p>
+        <p class="portal-lead">Choose a username, your email for confirmations and editor updates, and a password. Usernames are lowercase letters, numbers, and underscores only.</p>
 
         <?php if ($dbError !== ''): ?>
           <p class="banner banner--err" role="alert"><?php echo h($dbError); ?></p>
@@ -83,7 +90,11 @@ require_once AKH_ROOT . '/includes/header.php';
           </label>
           <label class="field">
             <span>Username</span>
-            <input type="text" name="username" required autocomplete="username" maxlength="32" pattern="[a-zA-Z][a-zA-Z0-9_]{2,31}" title="Letter first, then letters, numbers, or underscores (3–32 chars)" />
+            <input type="text" name="username" required autocomplete="username" maxlength="32" pattern="[a-z][a-z0-9_]{2,31}" title="Lowercase letter first, then letters, numbers, or underscores (3–32 chars)" />
+          </label>
+          <label class="field">
+            <span>Email <span class="req">*</span></span>
+            <input type="email" name="email" required maxlength="120" autocomplete="email" placeholder="you@example.com" value="<?php echo h($_POST['email'] ?? ''); ?>" />
           </label>
           <label class="field">
             <span>Password <span class="req">*</span></span>

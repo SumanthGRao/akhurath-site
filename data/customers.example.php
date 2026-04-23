@@ -18,6 +18,8 @@ declare(strict_types=1);
  *
  * Self-registration: when AKH_ALLOW_CLIENT_REGISTRATION is true in includes/config.php,
  * new rows are appended here by /customer/register.php (lowercase usernames).
+ * Registration also stores each client’s contact email in data/customer-emails.json
+ * (not committed) for task and account notifications when SMTP is enabled.
  *
  * The website login checks ONLY this file. Your NAS (drive.akhurathstudio.com)
  * must have a matching user if you want the same username/password everywhere —

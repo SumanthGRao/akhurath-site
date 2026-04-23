@@ -105,17 +105,19 @@ const SITE_TAGLINE = 'Wedding film editing — edit, color, sound, and story.';
 const CONTACT_EMAIL = 'info@akhurathstudio.com';
 
 /**
- * Hostinger email (or any SMTP): set AKH_SMTP_ENABLED true and fill credentials to send
- * admin verification and security notifications. Port 465 + ssl is typical for Hostinger.
+ * Outbound mail (Zoho Mail, etc.): set AKH_SMTP_ENABLED true and fill AKH_SMTP_USER / AKH_SMTP_PASS.
+ * Zoho India data centre: smtp.zoho.in, port 465, encryption ssl. Other regions may use smtp.zoho.com:587 + tls.
+ * Also used for Get in touch acknowledgements, client registration, new tasks, and editor updates.
  */
 const AKH_SMTP_ENABLED = false;
-const AKH_SMTP_HOST = 'smtp.hostinger.com';
+const AKH_SMTP_HOST = 'smtp.zoho.in';
 const AKH_SMTP_PORT = 465;
 /** 'ssl' (e.g. port 465) or 'tls' (STARTTLS, e.g. port 587) */
 const AKH_SMTP_ENCRYPTION = 'ssl';
 const AKH_SMTP_USER = '';
 const AKH_SMTP_PASS = '';
-const AKH_SMTP_FROM_EMAIL = '';
+/** Should match an address on your Zoho domain (e.g. info@akhurathstudio.com). */
+const AKH_SMTP_FROM_EMAIL = 'info@akhurathstudio.com';
 const AKH_SMTP_FROM_NAME = SITE_NAME;
 
 /** Contact form: messages are sent to this address. */

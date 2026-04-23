@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/site-notify-mail.php';
+
 function akh_tasks_file(): string
 {
     return AKH_ROOT . '/data/tasks.json';
@@ -308,6 +310,11 @@ function akh_task_editor_append_thread(string $taskId, string $editorUsername, s
         $list[$i]['updated_at'] = gmdate('c');
         if (!akh_tasks_save_locked($list)) {
             return 'Could not save.';
+        }
+        $cu = strtolower(trim((string) ($list[$i]['client_username'] ?? '')));
+        if ($cu !== '') {
+            $snippet = mb_strlen($body) > 600 ? mb_substr($body, 0, 600) . '…' : $body;
+            akh_site_mail_client_editor_activity($cu, $list[$i], 'Your editor sent a message on your task.', $snippet);
         }
 
         return null;
@@ -974,6 +981,8 @@ function akh_task_create_bundle(
     foreach ($childRows as $ch) {
         akh_task_write_studio_notification($ch);
     }
+    akh_site_mail_studio_new_bundle($parent, $childRows);
+    akh_site_mail_client_new_bundle($clientUsername, $parent, $childRows);
 
     return $parent;
 }
@@ -1234,6 +1243,8 @@ function akh_task_create(
     }
 
     akh_task_write_studio_notification($task);
+    akh_site_mail_studio_new_task($task);
+    akh_site_mail_client_new_task($clientUsername, $task);
 
     return $task;
 }
@@ -1641,6 +1652,16 @@ function akh_task_claim(string $taskId, string $editorUsername): ?array
         akh_task_bundle_sync_parent($parentId);
     }
 
+    $cu = strtolower(trim((string) ($out['client_username'] ?? '')));
+    if ($cu !== '') {
+        akh_site_mail_client_editor_activity(
+            $cu,
+            $out,
+            'An editor has claimed your task.',
+            akh_task_status_label('assigned') . ' — ' . $editorUsername . ' will begin work on ' . ($out['title'] ?? 'your task') . '.'
+        );
+    }
+
     return $out;
 }
 
@@ -1692,6 +1713,16 @@ function akh_task_set_status(string $taskId, string $editorUsername, string $new
         if ($pid !== '') {
             akh_task_bundle_sync_parent($pid);
         }
+    }
+
+    $cuser = strtolower(trim((string) ($out['client_username'] ?? '')));
+    if ($notifyClient && $cuser !== '') {
+        $detail = 'Status: ' . akh_task_status_label($prevSt) . ' → ' . akh_task_status_label($newStatus);
+        if ($deliverableOutput !== '') {
+            $snippet = mb_strlen($deliverableOutput) > 800 ? mb_substr($deliverableOutput, 0, 800) . '…' : $deliverableOutput;
+            $detail .= "\n\nLatest from your editor:\n" . $snippet;
+        }
+        akh_site_mail_client_editor_activity($cuser, $out, 'Your task was updated.', $detail);
     }
 
     return $out;

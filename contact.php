@@ -28,7 +28,7 @@ $sent = false;
 /** One .txt file per submission (created on first use). */
 $enquiriesDir = AKH_ROOT . '/data/contact-enquiries';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $hp = trim((string) ($_POST['website'] ?? ''));
     if ($hp !== '') {
         $errors[] = 'Spam detected.';
@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim((string) ($_POST['name'] ?? ''));
     $company = trim((string) ($_POST['company'] ?? ''));
     $phone = trim((string) ($_POST['phone'] ?? ''));
+    $email = strtolower(trim((string) ($_POST['email'] ?? '')));
     $project = trim((string) ($_POST['project'] ?? ''));
 
     $postTopicKey = strtolower(trim((string) ($_POST['topic'] ?? '')));
@@ -53,6 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!preg_match('/^[0-9+\s().-]{7,40}$/u', $phone)) {
         $errors[] = 'Please enter a valid phone number (digits, spaces, +, brackets, or dashes).';
     }
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 120) {
+        $errors[] = 'Please enter a valid email address so we can confirm your enquiry.';
+    }
     if ($project === '' || mb_strlen($project) > 8000) {
         $errors[] = 'Please describe your project (max 8000 characters).';
     }
@@ -66,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             . 'Name: ' . $name . "\n"
             . 'Company: ' . $company . "\n"
             . 'Phone: ' . $phone . "\n"
+            . 'Email: ' . $email . "\n"
             . 'Service topic: ' . $topicLine . "\n"
             . "Project details:\n" . $project . "\n";
 
@@ -94,6 +99,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$written) {
             $errors[] = 'We could not save your enquiry. Please try again or use WhatsApp below.';
         } else {
+            require_once AKH_ROOT . '/includes/site-notify-mail.php';
+            $topicHuman = $postTopicLabel !== null && $postTopicLabel !== '' ? $postTopicLabel : '';
+            akh_site_mail_contact_ack_to_submitter($email, $name, $topicHuman);
+            akh_site_mail_contact_notify_studio($name, $company, $phone, $email, $project, $topicHuman);
             $sent = true;
         }
     }
@@ -105,7 +114,7 @@ require_once AKH_ROOT . '/includes/header.php';
   <main id="main" class="contact-main">
     <div class="contact-shell">
       <h1 class="contact-title">Tell us what you need</h1>
-      <p class="contact-lead">Fields marked <span class="req">*</span> are required. Each submission is saved on this server as its own text file in a private folder for the studio to read.</p>
+      <p class="contact-lead">Fields marked <span class="req">*</span> are required. Each submission is saved on this server for the studio. When outbound mail is enabled, you receive a confirmation at your email and we are notified at <?php echo h(LEADS_EMAIL); ?>.</p>
 
       <div class="contact-connect">
         <a class="btn btn--whatsapp btn--whatsapp-lg" href="<?php echo h(whatsapp_chat_url($waPrefill)); ?>" target="_blank" rel="noopener noreferrer">Message us on WhatsApp</a>
@@ -146,6 +155,10 @@ require_once AKH_ROOT . '/includes/header.php';
           <label class="field">
             <span>Phone number <span class="req">*</span></span>
             <input type="tel" name="phone" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="+91 …" value="<?php echo h($_POST['phone'] ?? ''); ?>" />
+          </label>
+          <label class="field">
+            <span>Email <span class="req">*</span></span>
+            <input type="email" name="email" required maxlength="120" autocomplete="email" placeholder="you@example.com" value="<?php echo h($_POST['email'] ?? ''); ?>" />
           </label>
           <label class="field">
             <span>Project details <span class="req">*</span></span>
