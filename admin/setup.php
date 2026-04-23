@@ -67,14 +67,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && AKH_ADMIN_SETUP_ENABLED) {
             if ($hash === false) {
                 $error = 'Could not hash password.';
             } elseif (!akh_admin_save_accounts([$user => $hash])) {
-                $error = 'Could not save the admin account. Check database connection and permissions.';
+                $error = 'Could not save the admin account. With MySQL: confirm config/database.local.php uses the same dbname as phpMyAdmin and import sql/schema.sql. Without MySQL: ensure the server user can create files in data/.';
             } elseif (!akh_admin_meta_save([
                 'email' => $email,
                 'email_verified' => !AKH_SMTP_ENABLED,
                 'verify_token' => null,
                 'verify_expires_at' => null,
             ])) {
-                $error = 'Account was created but saving profile failed. Check database / app_kv.';
+                $error = 'Account was created but saving the admin profile failed (app_kv or data/admin-meta.php).';
             } elseif (AKH_SMTP_ENABLED) {
                 $token = akh_admin_meta_begin_verification($email);
                 if ($token === null) {

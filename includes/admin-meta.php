@@ -2,13 +2,22 @@
 
 declare(strict_types=1);
 
+const AKH_ADMIN_META_KV_KEY = 'admin_meta';
+
 function akh_admin_meta_path(): string
 {
     return AKH_ROOT . '/data/admin-meta.php';
 }
 
+function akh_admin_meta_require_kv(): void
+{
+    if (function_exists('akh_db') && !function_exists('akh_kv_get')) {
+        require_once __DIR__ . '/app-kv.php';
+    }
+}
+
 /**
- * Admin console notification / verification profile (data/admin-meta.php).
+ * Admin console notification / verification profile (MySQL app_kv when DB is on, else data/admin-meta.php).
  *
  * @return array{email: string, email_verified: bool, verify_token: ?string, verify_expires_at: ?int}
  */
@@ -20,6 +29,25 @@ function akh_admin_meta(): array
         'verify_token' => null,
         'verify_expires_at' => null,
     ];
+
+    if (function_exists('akh_kv_get')) {
+        akh_admin_meta_require_kv();
+        $raw = akh_kv_get(AKH_ADMIN_META_KV_KEY);
+        if ($raw === null || $raw === '') {
+            return $default;
+        }
+        try {
+            $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable $e) {
+            return $default;
+        }
+        if (!is_array($data)) {
+            return $default;
+        }
+
+        return array_merge($default, array_intersect_key($data, $default));
+    }
+
     $path = akh_admin_meta_path();
     if (!is_file($path)) {
         return $default;
@@ -39,6 +67,18 @@ function akh_admin_meta_save(array $patch): bool
 {
     $cur = akh_admin_meta();
     $next = array_merge($cur, $patch);
+
+    if (function_exists('akh_kv_set')) {
+        akh_admin_meta_require_kv();
+        try {
+            akh_kv_set(AKH_ADMIN_META_KV_KEY, json_encode($next, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     $path = akh_admin_meta_path();
     $dir = dirname($path);
     if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {

@@ -23,6 +23,7 @@ declare(strict_types=1);
  * Full MySQL wipe (users + tasks + enquiries + notifications): php scripts/reset-database.php --confirm
  *
  * === Local XAMPP ===
+ * The part after dbname= must match the database name in phpMyAdmin exactly (create the DB first).
  *
  * define('AKH_DB_DSN', 'mysql:host=127.0.0.1;dbname=akhurath_studio;charset=utf8mb4');
  * define('AKH_DB_USER', 'root');

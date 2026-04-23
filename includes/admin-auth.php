@@ -2,11 +2,29 @@
 
 declare(strict_types=1);
 
+function akh_admin_storage_is_database(): bool
+{
+    return function_exists('akh_db');
+}
+
 /**
  * @return array<string, string> lowercase username => password_hash
  */
 function akh_admin_accounts(): array
 {
+    if (akh_admin_storage_is_database()) {
+        $st = akh_db()->prepare(
+            'SELECT username, password_hash FROM users WHERE role = ? ORDER BY username'
+        );
+        $st->execute(['admin']);
+        $out = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $out[strtolower((string) $row['username'])] = (string) $row['password_hash'];
+        }
+
+        return $out;
+    }
+
     $path = AKH_ROOT . '/data/admins.php';
     if (!is_file($path)) {
         return [];
@@ -33,7 +51,7 @@ function akh_admin_request_is_loopback(): bool
 }
 
 /**
- * When true, admin accepts username/password `test`/`test` without data/admins.php (UI / local dev).
+ * When true, admin accepts username/password `test`/`test` without real admin accounts (UI / local dev).
  * Enabled if: AKH_ADMIN_DEV_TEST_LOGIN, or AKH_DEV_TEST_LOGIN, or loopback with no admin accounts yet.
  */
 function akh_admin_dev_test_login_allowed(): bool
@@ -95,6 +113,33 @@ function akh_require_admin(): void
  */
 function akh_admin_save_accounts(array $accounts): bool
 {
+    if (akh_admin_storage_is_database()) {
+        try {
+            $pdo = akh_db();
+            $pdo->beginTransaction();
+            $pdo->prepare('DELETE FROM users WHERE role = ?')->execute(['admin']);
+            $ins = $pdo->prepare(
+                'INSERT INTO users (role, username, password_hash) VALUES (?, ?, ?)'
+            );
+            foreach ($accounts as $u => $hash) {
+                $u = strtolower(trim((string) $u));
+                if ($u === '' || !is_string($hash)) {
+                    continue;
+                }
+                $ins->execute(['admin', $u, $hash]);
+            }
+            $pdo->commit();
+
+            return true;
+        } catch (\Throwable $e) {
+            if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            return false;
+        }
+    }
+
     $target = AKH_ROOT . '/data/admins.php';
     $dir = dirname($target);
     if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
@@ -121,6 +166,19 @@ function akh_admin_update_password_hash(string $username, string $newHash): bool
     if ($key === '' || $newHash === '') {
         return false;
     }
+
+    if (akh_admin_storage_is_database()) {
+        try {
+            $st = akh_db()->prepare(
+                'UPDATE users SET password_hash = ? WHERE role = ? AND username = ?'
+            );
+
+            return $st->execute([$newHash, 'admin', $key]) && $st->rowCount() > 0;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     $accounts = akh_admin_accounts();
     if (!isset($accounts[$key])) {
         return false;
