@@ -15,6 +15,10 @@ declare(strict_types=1);
  * define('AKH_DB_PASS', 'YOUR_PASSWORD_HERE');
  *
  * Import: phpMyAdmin → select database → Import → sql/schema.sql
+ * Or CLI: ./scripts/mysql-import-schema.sh (set DB_HOST, DB_USER, DB_NAME, MYSQL_PWD as needed).
+ * After any import or old DB: php scripts/ensure-database.php
+ * With legacy data/customers.php: php scripts/ensure-database.php --migrate-customers-from-files
+ * Full MySQL wipe (users + tasks + enquiries + notifications): php scripts/reset-database.php --confirm
  *
  * === Local XAMPP ===
  *

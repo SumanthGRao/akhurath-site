@@ -11,9 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
   role ENUM('customer', 'editor', 'admin') NOT NULL,
   username VARCHAR(64) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  email VARCHAR(120) NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_role_username (role, username)
+  UNIQUE KEY uq_role_username (role, username),
+  KEY ix_users_customer_email (role, email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS app_kv (

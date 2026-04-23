@@ -14,19 +14,33 @@ function akh_customer_accounts_path(): string
 
 function akh_customer_accounts(): array
 {
+    if (akh_customer_storage_is_database()) {
+        $st = akh_db()->query("SELECT username, password_hash FROM users WHERE role = 'customer' ORDER BY username");
+        if ($st === false) {
+            return [];
+        }
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $u = strtolower(trim((string) ($row['username'] ?? '')));
+            $h = (string) ($row['password_hash'] ?? '');
+            if ($u !== '' && $h !== '') {
+                $out[$u] = $h;
+            }
+        }
+
+        return $out;
+    }
+
     $path = akh_customer_accounts_path();
     if (!is_file($path)) {
         return [];
     }
-
     $data = require $path;
 
     return is_array($data) ? $data : [];
 }
 
 /**
- * Persist the full customer map (username => bcrypt hash). Usernames should be normalized (e.g. lowercase).
- *
  * @param array<string, string> $accounts
  */
 function akh_customer_write_accounts_file(array $accounts): bool
@@ -73,6 +87,28 @@ function akh_customer_register(string $username, string $email, string $password
     $email = strtolower(trim($email));
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 120) {
         return 'Please enter a valid email address for confirmations and task updates.';
+    }
+
+    if (akh_customer_storage_is_database()) {
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        if ($hash === false) {
+            return 'Could not hash password.';
+        }
+        try {
+            $st = akh_db()->prepare(
+                'INSERT INTO users (role, username, password_hash, email) VALUES (?, ?, ?, ?)'
+            );
+            $st->execute(['customer', $username, $hash, $email]);
+        } catch (\PDOException $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'Duplicate') || str_contains($msg, '1062')) {
+                return 'That username is already taken.';
+            }
+
+            return 'Could not save your account. Check the database.';
+        }
+
+        return null;
     }
 
     $lockPath = AKH_ROOT . '/data/.customers-register.lock';
@@ -136,6 +172,34 @@ function akh_customer_admin_add(string $username, string $password, string $pass
         return 'Passwords do not match.';
     }
 
+    $ce = strtolower(trim($contactEmail));
+    if ($ce !== '' && (!filter_var($ce, FILTER_VALIDATE_EMAIL) || mb_strlen($ce) > 120)) {
+        return 'Invalid contact email.';
+    }
+
+    if (akh_customer_storage_is_database()) {
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        if ($hash === false) {
+            return 'Could not hash password.';
+        }
+        $em = $ce !== '' ? $ce : null;
+        try {
+            $st = akh_db()->prepare(
+                'INSERT INTO users (role, username, password_hash, email) VALUES (?, ?, ?, ?)'
+            );
+            $st->execute(['customer', $username, $hash, $em]);
+        } catch (\PDOException $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'Duplicate') || str_contains($msg, '1062')) {
+                return 'That username already exists.';
+            }
+
+            return 'Could not save account. Check the database.';
+        }
+
+        return null;
+    }
+
     $lockPath = AKH_ROOT . '/data/.customers-register.lock';
     $lockFp = fopen($lockPath, 'c');
     if ($lockFp === false) {
@@ -156,14 +220,7 @@ function akh_customer_admin_add(string $username, string $password, string $pass
         if (!akh_customer_write_accounts_file($accounts)) {
             return 'Could not save accounts. Check data/ permissions.';
         }
-        $ce = strtolower(trim($contactEmail));
         if ($ce !== '') {
-            if (!filter_var($ce, FILTER_VALIDATE_EMAIL) || mb_strlen($ce) > 120) {
-                unset($accounts[$username]);
-                akh_customer_write_accounts_file($accounts);
-
-                return 'Invalid contact email.';
-            }
             if (!akh_customer_email_set($username, $ce)) {
                 unset($accounts[$username]);
                 akh_customer_write_accounts_file($accounts);
@@ -184,6 +241,13 @@ function akh_customer_delete(string $username): bool
     $key = strtolower(trim($username));
     if ($key === '') {
         return false;
+    }
+
+    if (akh_customer_storage_is_database()) {
+        $st = akh_db()->prepare('DELETE FROM users WHERE role = ? AND username = ?');
+        $st->execute(['customer', $key]);
+
+        return $st->rowCount() >= 1;
     }
 
     $lockPath = AKH_ROOT . '/data/.customers-register.lock';
@@ -226,8 +290,29 @@ function akh_customer_login(string $username, string $password): bool
         return true;
     }
 
-    $accounts = akh_customer_accounts();
     $key = strtolower(trim($username));
+    if ($key === '') {
+        return false;
+    }
+
+    if (akh_customer_storage_is_database()) {
+        $st = akh_db()->prepare('SELECT password_hash FROM users WHERE role = ? AND username = ? LIMIT 1');
+        $st->execute(['customer', $key]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return false;
+        }
+        $hash = (string) ($row['password_hash'] ?? '');
+        if ($hash === '' || !password_verify($password, $hash)) {
+            return false;
+        }
+        session_regenerate_id(true);
+        $_SESSION['akh_customer'] = $key;
+
+        return true;
+    }
+
+    $accounts = akh_customer_accounts();
     if (!isset($accounts[$key])) {
         return false;
     }
