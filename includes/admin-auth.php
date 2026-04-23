@@ -115,35 +115,38 @@ function akh_require_admin(): void
 function akh_admin_save_accounts(array $accounts, ?string $contactEmail = null): bool
 {
     if (akh_admin_storage_is_database()) {
-        $emailForRow = null;
+        $bindEmail = null;
         if ($contactEmail !== null && count($accounts) === 1) {
             $ce = strtolower(trim($contactEmail));
             if ($ce !== '' && filter_var($ce, FILTER_VALIDATE_EMAIL) && mb_strlen($ce) <= 120) {
-                $emailForRow = $ce;
+                $bindEmail = $ce;
             }
         }
         try {
             $pdo = akh_db();
             $pdo->beginTransaction();
             $pdo->prepare('DELETE FROM users WHERE role = ?')->execute(['admin']);
-            if ($emailForRow !== null) {
-                $ins = $pdo->prepare(
-                    'INSERT INTO users (role, username, password_hash, email) VALUES (?, ?, ?, ?)'
-                );
-            } else {
-                $ins = $pdo->prepare(
-                    'INSERT INTO users (role, username, password_hash) VALUES (?, ?, ?)'
-                );
-            }
+            // Always set `email` column (NULL or contact) so first-time setup never leaves it unset.
+            $ins = $pdo->prepare(
+                'INSERT INTO users (role, username, password_hash, email) VALUES (?, ?, ?, ?)'
+            );
             foreach ($accounts as $u => $hash) {
                 $u = strtolower(trim((string) $u));
                 if ($u === '' || !is_string($hash)) {
                     continue;
                 }
-                if ($emailForRow !== null) {
-                    $ins->execute(['admin', $u, $hash, $emailForRow]);
-                } else {
-                    $ins->execute(['admin', $u, $hash]);
+                $ins->execute(['admin', $u, $hash, $bindEmail]);
+            }
+            // Ensure contact email is on the row (covers any INSERT/bind edge cases on first-time setup).
+            if ($contactEmail !== null && count($accounts) === 1) {
+                $ce = strtolower(trim($contactEmail));
+                if ($ce !== '' && filter_var($ce, FILTER_VALIDATE_EMAIL) && mb_strlen($ce) <= 120) {
+                    $ukey = strtolower(trim((string) array_key_first($accounts)));
+                    if ($ukey !== '') {
+                        $pdo->prepare(
+                            'UPDATE users SET email = ? WHERE role = ? AND username = ?'
+                        )->execute([$ce, 'admin', $ukey]);
+                    }
                 }
             }
             $pdo->commit();
