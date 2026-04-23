@@ -48,11 +48,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && AKH_ALLOW_CLIENT_REGISTRATI
                 } else {
                     require_once AKH_ROOT . '/includes/site-notify-mail.php';
                     $em = strtolower(trim($email));
+                    $smtpOk = akh_site_notify_smtp_enabled();
                     if ($em !== '' && filter_var($em, FILTER_VALIDATE_EMAIL)) {
-                        akh_site_mail_client_registration_welcome($em, strtolower(trim($user)));
-                        akh_site_mail_studio_new_client(strtolower(trim($user)), $em);
+                        if ($smtpOk) {
+                            akh_site_mail_client_registration_welcome($em, strtolower(trim($user)));
+                            akh_site_mail_studio_new_client(strtolower(trim($user)), $em);
+                        }
                     }
-                    header('Location: ' . base_path('customer/login.php?registered=1'));
+                    $notice = $smtpOk ? '1' : '0';
+                    header('Location: ' . base_path('customer/login.php?registered=1&email_notice=' . $notice));
                     exit;
                 }
             } catch (Throwable $e) {

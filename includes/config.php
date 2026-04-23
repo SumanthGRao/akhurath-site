@@ -105,9 +105,12 @@ const SITE_TAGLINE = 'Wedding film editing — edit, color, sound, and story.';
 const CONTACT_EMAIL = 'info@akhurathstudio.com';
 
 /**
- * Outbound mail (Zoho Mail, etc.): set AKH_SMTP_ENABLED true and fill AKH_SMTP_USER / AKH_SMTP_PASS.
- * Zoho India data centre: smtp.zoho.in, port 465, encryption ssl. Other regions may use smtp.zoho.com:587 + tls.
- * Also used for Get in touch acknowledgements, client registration, new tasks, and editor updates.
+ * Outbound mail (Zoho Mail, etc.).
+ * Git ships with mail OFF and empty credentials. On Hostinger (or any production host), edit THIS file
+ * in File Manager: set AKH_SMTP_ENABLED true and AKH_SMTP_USER / AKH_SMTP_PASS (and host/port if not India Zoho).
+ * Otherwise registration / contact / task emails are skipped with no error on the form.
+ *
+ * Zoho India: smtp.zoho.in, port 465, encryption ssl. Other regions may use smtp.zoho.com:587 + tls.
  */
 const AKH_SMTP_ENABLED = false;
 const AKH_SMTP_HOST = 'smtp.zoho.in';
