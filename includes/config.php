@@ -106,7 +106,7 @@ const AKH_ADMIN_SETUP_ENABLED = true;
 
 /** Site identity */
 const SITE_NAME = 'Akhurath Studio';
-const SITE_TAGLINE = 'Wedding film editing — edit, color, sound, and story.';
+const SITE_TAGLINE = 'EDIT | DELIVER | ELEVATE';
 const CONTACT_EMAIL = 'info@akhurathstudio.com';
 
 /**
